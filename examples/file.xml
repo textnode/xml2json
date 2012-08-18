@@ -1,0 +1,1 @@
+<parent><child1 c1_attr1="abc" c1_attr2="def">g<gchild1 gc1_attr1="hij" gc1_attr2="klm">n</gchild1><gchild2/><gchild3 gc3_attr1="nop"/></child1><child2 c2_attr1="def" c2_attr2="ghi">xyz</child2></parent>
