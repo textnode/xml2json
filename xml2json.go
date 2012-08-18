@@ -15,89 +15,125 @@
 package xml2json
 
 import (
-    "io"
-    "encoding/xml"
-    "github.com/textnode/jsonStreamer"
+	"encoding/xml"
+	"github.com/textnode/jsonStreamer"
+	"io"
 )
 
 type Frame struct {
-    collectedText []byte
+	collectedText []byte
 }
 
 func NewFrame() *Frame {
-    return &Frame{collectedText : make([]byte, 0, 0)}
+	return &Frame{collectedText: make([]byte, 0, 0)}
 }
 
 func (self *Frame) AddText(text []byte) {
-    capacity := cap(self.collectedText)
-    currentSize := len(self.collectedText)
-    requiredSize := currentSize + len(text)
-    if requiredSize > capacity {
-        newCollectedText := make([]byte, requiredSize, requiredSize * 2)
-        copy(newCollectedText[0:currentSize], self.collectedText[0:currentSize])
-        self.collectedText = newCollectedText
-    }
-    copy(self.collectedText[currentSize:requiredSize], text)
+	capacity := cap(self.collectedText)
+	currentSize := len(self.collectedText)
+	requiredSize := currentSize + len(text)
+	if requiredSize > capacity {
+		newCollectedText := make([]byte, requiredSize, requiredSize*2)
+		copy(newCollectedText[0:currentSize], self.collectedText[0:currentSize])
+		self.collectedText = newCollectedText
+	}
+	copy(self.collectedText[currentSize:requiredSize], text)
 }
 
 type Xml2Json struct {
-	textKey string
+	textKey     string
 	childrenKey string
-    frames []*Frame
+	frames      []*Frame
 }
 
 func NewXml2Json(textKey string, childrenKey string) *Xml2Json {
-    var newXml2Json *Xml2Json = &Xml2Json{textKey : textKey, childrenKey : childrenKey, frames : make([]*Frame, 1, 10)}
-    newXml2Json.frames[0] = NewFrame()
-    return newXml2Json
+	var newXml2Json *Xml2Json = &Xml2Json{textKey: textKey, childrenKey: childrenKey, frames: make([]*Frame, 1, 10)}
+	newXml2Json.frames[0] = NewFrame()
+	return newXml2Json
 }
 
 func (self *Xml2Json) Transform(in io.Reader, out io.Writer) (err error) {
-    var decoder *xml.Decoder = xml.NewDecoder(in)
-    var encoder *jsonStreamer.JsonStreamer = jsonStreamer.NewJsonStreamer(out)
+	var decoder *xml.Decoder = xml.NewDecoder(in)
+	var encoder *jsonStreamer.JsonStreamer = jsonStreamer.NewJsonStreamer(out)
 
-    var token xml.Token
-    token, err = decoder.Token()
+	var token xml.Token
+	token, err = decoder.Token()
 
-    for ; err == nil; token, err = decoder.Token() {
-        var currentFrameIndex int = len(self.frames) - 1
-        var currentFrame *Frame = self.frames[currentFrameIndex]
+	for ; err == nil; token, err = decoder.Token() {
+		var currentFrameIndex int = len(self.frames) - 1
+		var currentFrame *Frame = self.frames[currentFrameIndex]
 
-        switch specific := token.(type) {
-            case xml.StartElement:
-				encoder.StartObject()
+		switch specific := token.(type) {
+		case xml.StartElement:
+			err = encoder.StartObject()
+			if err != nil {
+				return
+			}
 
-                self.frames = append(self.frames, NewFrame())
-        		currentFrameIndex = len(self.frames) - 1
-        		currentFrame = self.frames[currentFrameIndex]
+			self.frames = append(self.frames, NewFrame())
+			currentFrameIndex = len(self.frames) - 1
+			currentFrame = self.frames[currentFrameIndex]
 
-                encoder.WriteKey(specific.Name.Local)
-                encoder.StartObject()
+			err = encoder.WriteKey(specific.Name.Local)
+			if err != nil {
+				return
+			}
+			err = encoder.StartObject()
+			if err != nil {
+				return
+			}
 
-                for _, attr := range specific.Attr {
-                    encoder.WriteKey(attr.Name.Local)
-                    encoder.WriteStringValue(attr.Value)
-                }
+			for _, attr := range specific.Attr {
+				err = encoder.WriteKey(attr.Name.Local)
+				if err != nil {
+					return
+				}
+				err = encoder.WriteStringValue(attr.Value)
+				if err != nil {
+					return
+				}
+			}
 
-				encoder.WriteKey(self.childrenKey)
-				encoder.StartArray()
+			err = encoder.WriteKey(self.childrenKey)
+			if err != nil {
+				return
+			}
+			err = encoder.StartArray()
+			if err != nil {
+				return
+			}
 
-            case xml.EndElement:
-				encoder.EndArray() //close children
+		case xml.EndElement:
+			err = encoder.EndArray() //close children
+			if err != nil {
+				return
+			}
 
-                if 0 < len(currentFrame.collectedText) {
-                    encoder.WriteKey(self.textKey)
-                    encoder.WriteStringValueBytes(currentFrame.collectedText)
-                }
-                self.frames = self.frames[:len(self.frames)-1]
-                encoder.EndObject()
-				encoder.EndObject()
-            case xml.CharData:
-                currentFrame.AddText(specific)
-            //case xml.Comment:
-            //case xml.ProcInst:
-            //case xml.Directive:
-        }
-    }
-    return
+			if 0 < len(currentFrame.collectedText) {
+				err = encoder.WriteKey(self.textKey)
+				if err != nil {
+					return
+				}
+				err = encoder.WriteStringValueBytes(currentFrame.collectedText)
+				if err != nil {
+					return
+				}
+			}
+			self.frames = self.frames[:len(self.frames)-1]
+			err = encoder.EndObject()
+			if err != nil {
+				return
+			}
+			err = encoder.EndObject()
+			if err != nil {
+				return
+			}
+		case xml.CharData:
+			currentFrame.AddText(specific)
+			//case xml.Comment:
+			//case xml.ProcInst:
+			//case xml.Directive:
+		}
+	}
+	return
 }
