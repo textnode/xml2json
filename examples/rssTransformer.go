@@ -18,7 +18,7 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	out, err := os.Create("file.json")
+	out, err := os.Create("rss.json")
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(-1)
