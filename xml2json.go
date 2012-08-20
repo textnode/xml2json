@@ -114,7 +114,7 @@ func (self *Xml2Json) Transform(in io.Reader, out io.Writer) (err error) {
 				if err != nil {
 					return
 				}
-				err = encoder.WriteStringValueBytes(currentFrame.collectedText)
+				err = encoder.WriteStringValue(string(currentFrame.collectedText))
 				if err != nil {
 					return
 				}
